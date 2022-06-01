@@ -1,0 +1,105 @@
+<!doctype html>
+
+<canvas id="layout_canvas" width="800" height="500" style="border:1px solid #000000;"></canvas>
+
+<script>
+
+let url = 'ws://localhost:8765/ws';
+
+var canvas = document.getElementById("layout_canvas");
+var context = canvas.getContext("2d");
+
+let socket = new WebSocket(url);
+socket.binaryType = "blob";
+
+socket.onopen = function(evt) {
+  socket.send("resize," + canvas.width + "," + canvas.height);
+}
+
+//  incoming messages are paint events
+socket.onmessage = function(evt) {
+  let blob = evt.data;
+  createImageBitmap(blob).then(function(image) {
+    context.drawImage(image, 0, 0)
+  });
+};
+
+socket.onclose = evt => console.log(`Closed ${evt.code}`);
+
+function mouseEventToString(canvas, type, evt) {
+  var rect = canvas.getBoundingClientRect();
+  var x = evt.clientX - rect.left;
+  var y = evt.clientY - rect.top;
+  var keys = 0;
+  if (evt.shiftKey) {
+    keys += 1;
+  }
+  if (evt.ctrlKey) {
+    keys += 2;
+  }
+  if (evt.altKey) {
+    keys += 4;
+  }
+  return type + "," + x + "," + y + "," + evt.buttons + "," + keys;
+}
+
+function sendMouseEvent(canvas, type, evt) {
+  if (socket.readyState == 1 /*OPEN*/) {
+    var message = mouseEventToString(canvas, type, evt);
+    socket.send(message);
+  }
+}
+
+function sendWheelEvent(canvas, type, evt) {
+  if (socket.readyState == 1 /*OPEN*/) {
+    var message = mouseEventToString(canvas, type, evt);
+    message += "," + evt.deltaY + "," + evt.deltaMode;
+    socket.send(message);
+  }
+}
+
+canvas.addEventListener('contextmenu', function(evt) {
+  evt.preventDefault();
+});
+
+canvas.addEventListener('mousemove', function (evt) {
+  sendMouseEvent(canvas, "mouse_move", evt);
+  evt.preventDefault();
+}, false);
+
+canvas.addEventListener('click', function (evt) {
+  sendMouseEvent(canvas, "mouse_click", evt);
+  evt.preventDefault();
+}, false);
+
+canvas.addEventListener('dblclick', function (evt) {
+  sendMouseEvent(canvas, "mouse_dblclick", evt);
+  evt.preventDefault();
+}, false);
+
+canvas.addEventListener('mousedown', function (evt) {
+  sendMouseEvent(canvas, "mouse_pressed", evt);
+  evt.preventDefault();
+}, false);
+
+canvas.addEventListener('mouseup', function (evt) {
+  sendMouseEvent(canvas, "mouse_released", evt);
+  evt.preventDefault();
+}, false);
+
+canvas.addEventListener('mouseenter', function (evt) {
+  sendMouseEvent(canvas, "mouse_enter", evt);
+  evt.preventDefault();
+}, false);
+
+canvas.addEventListener('mouseout', function (evt) {
+  sendMouseEvent(canvas, "mouse_leave", evt);
+  evt.preventDefault();
+}, false);
+
+canvas.addEventListener('wheel', function (evt) {
+  sendWheelEvent(canvas, "wheel", evt);
+  evt.preventDefault();
+}, false);
+
+</script>
