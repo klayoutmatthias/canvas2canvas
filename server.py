@@ -3,9 +3,15 @@
 import asyncio
 import websockets
 import time
+import json
 # NOTE: import db to enable stream format readers
 import klayout.db as db
 import klayout.lay as lay
+
+host = "localhost"
+port = 8765
+
+layout_url = "https://github.com/KLayout/klayout/blob/master/testdata/gds/t10.gds?raw=true"
 
 class LayoutViewServer(object):
 
@@ -14,17 +20,15 @@ class LayoutViewServer(object):
     self.url = url
 
   def run(self):
-    start_server = websockets.serve(self.connection, 'localhost', 8765)
+    start_server = websockets.serve(self.connection, host, port)
     asyncio.get_event_loop().run_until_complete(start_server)
     asyncio.get_event_loop().run_forever()
 
   async def send_image(self, websocket, data):
-    print("@@@ sent image ..")
     await websocket.send(data)
 
   def image_updated(self, websocket):
     pixel_buffer = self.layout_view.get_screenshot_pixels()
-    print(f"@@@ got image ... {pixel_buffer.width()},{pixel_buffer.height()}")
     asyncio.create_task(self.send_image(websocket, pixel_buffer.to_png_data()))
 
   async def connection(self, websocket, path):
@@ -44,12 +48,10 @@ class LayoutViewServer(object):
       self.layout_view.timer()
       await asyncio.sleep(0.01)
 
-  def mouse_event(self, function, tokens):
-    x = int(tokens[1])
-    y = int(tokens[2])
-    b = int(tokens[3])
-    k = int(tokens[4])
+  def buttons_from_js(self, js):
     buttons = 0
+    k = js["k"]
+    b = js["b"]
     if (k & 1) != 0:
       buttons |= lay.ButtonState.ShiftKey
     if (k & 2) != 0:
@@ -62,30 +64,49 @@ class LayoutViewServer(object):
       buttons |= lay.ButtonState.RightButton
     if (b & 4) != 0:
       buttons |= lay.ButtonState.MidButton
-    function(db.Point(x, y), buttons)
+    return buttons
+
+  def wheel_event(self, function, js):
+    delta = 0
+    dx = js["dx"]
+    dy = js["dy"]
+    if dx != 0:
+      delta = -dx
+      horizontal = True
+    elif dy != 0:
+      delta = -dy
+      horizontal = False
+    if delta != 0:
+      function(delta, horizontal, db.Point(js["x"], js["y"]), self.buttons_from_js(js))
+
+  def mouse_event(self, function, js):
+    function(db.Point(js["x"], js["y"]), self.buttons_from_js(js))
 
   async def reader(self, websocket):
     while(True):
-      msg = await websocket.recv()
-      if msg == "q":
+      js = await websocket.recv()
+      print(f"From Client: {js}") # @@@
+      js = json.loads(js)
+      msg = js["msg"]
+      if msg == "quit":
         break
-      print(f"From Client: {msg}") # @@@
-      tokens = msg.split(",")
-      if tokens[0] == "resize":
-        self.layout_view.resize(int(tokens[1]), int(tokens[2]))
-      elif tokens[0] == "mouse_move":
-        self.mouse_event(self.layout_view.send_mouse_move_event, tokens)
-      elif tokens[0] == "mouse_pressed":
-        self.mouse_event(self.layout_view.send_mouse_press_event, tokens)
-      elif tokens[0] == "mouse_released":
-        self.mouse_event(self.layout_view.send_mouse_release_event, tokens)
-      elif tokens[0] == "mouse_enter":
+      elif msg == "resize":
+        self.layout_view.resize(js["width"], js["height"])
+      elif msg == "mouse_move":
+        self.mouse_event(self.layout_view.send_mouse_move_event, js)
+      elif msg == "mouse_pressed":
+        self.mouse_event(self.layout_view.send_mouse_press_event, js)
+      elif msg == "mouse_released":
+        self.mouse_event(self.layout_view.send_mouse_release_event, js)
+      elif msg == "mouse_enter":
         self.layout_view.send_enter_event()
-      elif tokens[0] == "mouse_leave":
+      elif msg == "mouse_leave":
         self.layout_view.send_leave_event()
-      elif tokens[0] == "mouse_dblclick":
-        self.mouse_event(self.layout_view.send_mouse_double_clicked_event, tokens)
+      elif msg == "mouse_dblclick":
+        self.mouse_event(self.layout_view.send_mouse_double_clicked_event, js)
+      elif msg == "wheel":
+        self.wheel_event(self.layout_view.send_wheel_event, js)
 
-server = LayoutViewServer("https://github.com/KLayout/klayout/blob/master/testdata/gds/t10.gds?raw=true")
+server = LayoutViewServer(layout_url)
 server.run()
 

@@ -13,7 +13,8 @@ let socket = new WebSocket(url);
 socket.binaryType = "blob";
 
 socket.onopen = function(evt) {
-  socket.send("resize," + canvas.width + "," + canvas.height);
+  var ev = { msg: "resize", width: canvas.width, height: canvas.height };
+  socket.send(JSON.stringify(ev));
 }
 
 //  incoming messages are paint events
@@ -26,7 +27,7 @@ socket.onmessage = function(evt) {
 
 socket.onclose = evt => console.log(`Closed ${evt.code}`);
 
-function mouseEventToString(canvas, type, evt) {
+function mouseEventToJSON(canvas, type, evt) {
   var rect = canvas.getBoundingClientRect();
   var x = evt.clientX - rect.left;
   var y = evt.clientY - rect.top;
@@ -40,21 +41,23 @@ function mouseEventToString(canvas, type, evt) {
   if (evt.altKey) {
     keys += 4;
   }
-  return type + "," + x + "," + y + "," + evt.buttons + "," + keys;
+  return { msg: type, x: x, y: y, b: evt.buttons, k: keys };
 }
 
 function sendMouseEvent(canvas, type, evt) {
   if (socket.readyState == 1 /*OPEN*/) {
-    var message = mouseEventToString(canvas, type, evt);
-    socket.send(message);
+    var ev = mouseEventToJSON(canvas, type, evt);
+    socket.send(JSON.stringify(ev));
   }
 }
 
 function sendWheelEvent(canvas, type, evt) {
   if (socket.readyState == 1 /*OPEN*/) {
-    var message = mouseEventToString(canvas, type, evt);
-    message += "," + evt.deltaY + "," + evt.deltaMode;
-    socket.send(message);
+    var ev = mouseEventToJSON(canvas, type, evt);
+    ev.dx = evt.deltaX;
+    ev.dy = evt.deltaY;
+    ev.dm = evt.deltaMode;
+    socket.send(JSON.stringify(ev));
   }
 }
 
