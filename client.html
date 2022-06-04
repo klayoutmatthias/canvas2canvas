@@ -3,7 +3,7 @@
 <div class="viewer-panel">
   <div class="viewer-panel-sub">
     <div class="viewer-frame-cell">
-      <div class="viewer-frame">
+      <div class="viewer-frame" id="layout-view">
         <canvas id="layout_canvas"></canvas>
       </div>
     </div>
@@ -87,7 +87,7 @@
   height: 500px;
   resize: both;
   overflow: hidden;
-  padding: 0.5rem;
+  padding: 10px;
 }
 
 .viewer-layers-cell {
@@ -102,7 +102,7 @@
   overflow-y: scroll;
   padding: 0.5rem;
   height: 500px;
-  padding: 0.5rem;
+  padding: 10px;
 }
 
 </style>
@@ -186,8 +186,9 @@ var lastCanvasHeight = 0;
 
 setInterval(function() {
 
-  var w = canvas.offsetWidth;
-  var h = canvas.offsetHeight;
+  var view = document.getElementById('layout-view');
+  var w = view.clientWidth;
+  var h = view.clientHeight;
 
   if (lastCanvasWidth !== w || lastCanvasHeight !== h) {
 
@@ -197,19 +198,23 @@ setInterval(function() {
     tempCanvas.width = canvas.width;
     tempCanvas.height = canvas.height;
     var tempContext = tempCanvas.getContext("2d");
-    
     tempContext.drawImage(context.canvas, 0, 0);
 
     lastCanvasWidth = w;
     lastCanvasHeight = h;
-    canvas.width = w
-    canvas.height = h
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
 
     context.drawImage(tempContext.canvas, 0, 0);
 
-    socket.send(JSON.stringify({ msg: "resize", width: w, height: h }));
+    socket.send(JSON.stringify({ msg: "resize", width: canvas.width, height: canvas.height }));
 
-    // let layers = document.getElementById("layers");
+    //  resizes the layer list:
+
+    let layers = document.getElementById("layers");
+
+    var padding = 10; //  padding in pixels
+    layers.style.height = (h - 2 * padding) + "px";
 
   }
 
