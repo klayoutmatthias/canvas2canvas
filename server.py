@@ -31,11 +31,31 @@ class LayoutViewServer(object):
     pixel_buffer = self.layout_view.get_screenshot_pixels()
     asyncio.create_task(self.send_image(websocket, pixel_buffer.to_png_data()))
 
+  def layer_dump(self):
+    js = []
+    for l in self.layout_view.each_layer():
+      js.append({
+        "dp": l.eff_dither_pattern(),
+        "ls": l.eff_line_style(),
+        "c": l.eff_fill_color(),
+        "fc": l.eff_frame_color(),
+        "m": l.marked,
+        "s": l.source,
+        "t": l.transparent,
+        "va": l.valid,
+        "v": l.visible,
+        "w": l.width,
+        "x": l.xfill,
+        "name": l.name,
+      })
+    return js
+
   async def connection(self, websocket, path):
 
     self.layout_view = lay.LayoutView()
     self.layout_view.load_layout(self.url)
     self.layout_view.max_hier()
+    await websocket.send(json.dumps({ "msg": "loaded", "layers": self.layer_dump() }))
 
     writer_task = asyncio.create_task(self.timer(websocket))
     reader_task = asyncio.create_task(self.reader(websocket))
@@ -92,6 +112,9 @@ class LayoutViewServer(object):
         break
       elif msg == "resize":
         self.layout_view.resize(js["width"], js["height"])
+      elif msg == "initialize":
+        self.layout_view.resize(js["width"], js["height"])
+        await websocket.send(json.dumps({ "msg": "initialized" }))
       elif msg == "mouse_move":
         self.mouse_event(self.layout_view.send_mouse_move_event, js)
       elif msg == "mouse_pressed":

@@ -1,6 +1,111 @@
 <!doctype html>
 
-<canvas id="layout_canvas" width="800" height="500" style="border:1px solid #000000;"></canvas>
+<div class="viewer-panel">
+  <div class="viewer-panel-sub">
+    <div class="viewer-frame-cell">
+      <div class="viewer-frame">
+        <canvas id="layout_canvas"></canvas>
+      </div>
+    </div>
+    <div class="viewer-layers-cell">
+      <div class="viewer-layers" id="layers">
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+        here are the layers<br>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="message">
+</div>
+
+<style>
+
+#layout_canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.viewer-panel {
+  overflow: auto;
+  display: table;
+  border-spacing: 0.5rem;
+  padding: 0;
+}
+
+.viewer-panel-sub {
+  display: table-row;
+}
+
+.viewer-frame-cell {
+  display: table-cell;
+  vertical-align: top;
+  border: 1px solid #000000;
+  overflow: hidden;
+}
+
+.viewer-frame {
+  width: 800px;
+  height: 500px;
+  resize: both;
+  overflow: hidden;
+  padding: 0.5rem;
+}
+
+.viewer-layers-cell {
+  display: table-cell;
+  vertical-align: top;
+  border: 1px solid #000000;
+}
+
+.viewer-layers {
+  min-width: 20%;
+  white-space: nowrap;
+  overflow-y: scroll;
+  padding: 0.5rem;
+  height: 500px;
+  padding: 0.5rem;
+}
+
+</style>
 
 <script>
 
@@ -9,20 +114,33 @@ let url = 'ws://localhost:8765/ws';
 var canvas = document.getElementById("layout_canvas");
 var context = canvas.getContext("2d");
 
+var message = document.getElementById("message");
+
 let socket = new WebSocket(url);
 socket.binaryType = "blob";
+var initialized = false;
 
 socket.onopen = function(evt) {
-  var ev = { msg: "resize", width: canvas.width, height: canvas.height };
+  var ev = { msg: "initialize", width: canvas.width, height: canvas.height };
   socket.send(JSON.stringify(ev));
 }
 
-//  incoming messages are paint events
 socket.onmessage = function(evt) {
-  let blob = evt.data;
-  createImageBitmap(blob).then(function(image) {
-    context.drawImage(image, 0, 0)
-  });
+  let data = evt.data;
+  if (typeof(data) === "string") {
+    //  incoming messages are JSON objects
+    js = JSON.parse(data);
+    if (js.msg == "initialized") {
+      initialized = true;
+    } else if (js.msg == "loaded") {
+      message.textContent = data;
+    }
+  } else if (initialized) {
+    //  incoming blob messages are paint events
+    createImageBitmap(data).then(function(image) {
+      context.drawImage(image, 0, 0)
+    });
+  }
 };
 
 socket.onclose = evt => console.log(`Closed ${evt.code}`);
@@ -60,6 +178,42 @@ function sendWheelEvent(canvas, type, evt) {
     socket.send(JSON.stringify(ev));
   }
 }
+
+//  HTML5 does not have a resize event, so we need to poll
+
+var lastCanvasWidth = 0;
+var lastCanvasHeight = 0;
+
+setInterval(function() {
+
+  var w = canvas.offsetWidth;
+  var h = canvas.offsetHeight;
+
+  if (lastCanvasWidth !== w || lastCanvasHeight !== h) {
+
+    //  this avoids flicker:
+
+    var tempCanvas = document.createElement('canvas');
+    tempCanvas.width = canvas.width;
+    tempCanvas.height = canvas.height;
+    var tempContext = tempCanvas.getContext("2d");
+    
+    tempContext.drawImage(context.canvas, 0, 0);
+
+    lastCanvasWidth = w;
+    lastCanvasHeight = h;
+    canvas.width = w
+    canvas.height = h
+
+    context.drawImage(tempContext.canvas, 0, 0);
+
+    socket.send(JSON.stringify({ msg: "resize", width: w, height: h }));
+
+    // let layers = document.getElementById("layers");
+
+  }
+
+}, 10)
 
 canvas.addEventListener('contextmenu', function(evt) {
   evt.preventDefault();
