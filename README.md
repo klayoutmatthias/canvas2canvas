@@ -2,6 +2,10 @@
 
 KLayout Python module as a websockets client
 
+NOTE: this is a demonstrator. It shows the basic idea, but lacks fancy styling and 
+many potential features. It does not use any JavaScript libraries and only plain
+CSS.
+
 ## Getting the KLayout Python module
 
 You will need a KLayout Python module with Qt-less canvas enabled.
