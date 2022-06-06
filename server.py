@@ -47,6 +47,7 @@ class LayoutViewServer(object):
         "w": l.width,
         "x": l.xfill,
         "name": l.name,
+        "id": l.id()
       })
     return js
 
@@ -105,13 +106,23 @@ class LayoutViewServer(object):
   async def reader(self, websocket):
     while(True):
       js = await websocket.recv()
-      print(f"From Client: {js}") # @@@
+      print(f"From Client: {js}") # TODO: remove debug output
       js = json.loads(js)
       msg = js["msg"]
       if msg == "quit":
         break
       elif msg == "resize":
         self.layout_view.resize(js["width"], js["height"])
+      elif msg == "layer-v-all":
+        vis = js["value"]
+        for l in self.layout_view.each_layer():
+          l.visible = vis
+      elif msg == "layer-v":
+        id = js["id"]
+        vis = js["value"]
+        for l in self.layout_view.each_layer():
+          if l.id() == id:
+            l.visible = vis
       elif msg == "initialize":
         self.layout_view.resize(js["width"], js["height"])
         await websocket.send(json.dumps({ "msg": "initialized" }))
