@@ -31,6 +31,12 @@ class LayoutViewServer(object):
     pixel_buffer = self.layout_view.get_screenshot_pixels()
     asyncio.create_task(self.send_image(websocket, pixel_buffer.to_png_data()))
 
+  def mode_dump(self):
+    return self.layout_view.mode_names()
+
+  def annotation_dump(self):
+    return [ d[1] for d in self.layout_view.annotation_templates() ]
+
   def layer_dump(self):
     js = []
     for l in self.layout_view.each_layer():
@@ -56,7 +62,7 @@ class LayoutViewServer(object):
     self.layout_view = lay.LayoutView()
     self.layout_view.load_layout(self.url)
     self.layout_view.max_hier()
-    await websocket.send(json.dumps({ "msg": "loaded", "layers": self.layer_dump() }))
+    await websocket.send(json.dumps({ "msg": "loaded", "modes": self.mode_dump(), "annotations": self.annotation_dump(), "layers": self.layer_dump() }))
 
     writer_task = asyncio.create_task(self.timer(websocket))
     reader_task = asyncio.create_task(self.reader(websocket))
@@ -113,6 +119,14 @@ class LayoutViewServer(object):
         break
       elif msg == "resize":
         self.layout_view.resize(js["width"], js["height"])
+      elif msg == "clear-annotations":
+        self.layout_view.clear_annotations()
+      elif msg == "select-ruler":
+        ruler = js["value"]
+        self.layout_view.set_config("current-ruler-template", str(ruler))
+      elif msg == "select-mode":
+        mode = js["value"]
+        self.layout_view.switch_mode(mode)
       elif msg == "layer-v-all":
         vis = js["value"]
         for l in self.layout_view.each_layer():
@@ -126,6 +140,8 @@ class LayoutViewServer(object):
       elif msg == "initialize":
         self.layout_view.resize(js["width"], js["height"])
         await websocket.send(json.dumps({ "msg": "initialized" }))
+      elif msg == "mode_select":
+        self.layout_view.switch_mode(js["mode"])
       elif msg == "mouse_move":
         self.mouse_event(self.layout_view.send_mouse_move_event, js)
       elif msg == "mouse_pressed":

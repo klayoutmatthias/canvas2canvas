@@ -34,6 +34,7 @@ socket.onmessage = function(evt) {
       initialized = true;
     } else if (js.msg == "loaded") {
       showLayers(js.layers);
+      showMenu(js.modes, js.annotations);
     }
 
   } else if (initialized) {
@@ -130,6 +131,94 @@ setInterval(function() {
   }
 
 }, 10)
+
+//  Updates the layer list
+function showMenu(modes, annotations) {
+
+  var modeElement = document.getElementById("modes");
+  modeElement.childNodes = new Array();
+
+  var modeTable = document.createElement("table");
+  modeTable.className = "modes-table";
+  modeElement.appendChild(modeTable)
+
+  var modeRow = document.createElement("tr");
+  modeRow.className = "mode-row-header";
+  modeRow.id = "mode-row";
+  modeTable.appendChild(modeRow)
+
+  var cell;
+  var inner;
+
+  modes.forEach(function(m) {
+
+    cell = document.createElement("td");
+    cell.className = "mode-cell";
+
+    var inner = document.createElement("input");
+    inner.value = m;
+    inner.type = "button";
+    inner.className = "unchecked";
+    inner.onclick = function() {
+      var modeRow = document.getElementById("mode-row");
+      modeRow.childNodes.forEach(function (e) {
+        e.firstChild.className = "unchecked";
+      });
+      inner.className = "checked";
+      socket.send(JSON.stringify({ msg: "select-mode", value: m }));
+    };
+     
+    cell.appendChild(inner);
+    modeRow.appendChild(cell);
+
+  });
+
+  var menuElement = document.getElementById("menu");
+
+  var menuTable = document.createElement("table");
+  menuTable.className = "menu-table";
+  menuElement.appendChild(menuTable)
+
+  var menuRow = document.createElement("tr");
+  menuRow.className = "menu-row-header";
+  menuTable.appendChild(menuRow)
+
+  cell = document.createElement("td");
+  cell.className = "menu-cell";
+  menuRow.appendChild(cell);
+
+  var rulersSelect = document.createElement("select");
+  rulersSelect.onchange = function() {
+    socket.send(JSON.stringify({ msg: "select-ruler", value: rulersSelect.selectedIndex }));
+  };
+  cell.appendChild(rulersSelect);
+
+  cell = document.createElement("td");
+  cell.className = "menu-cell";
+  menuRow.appendChild(cell);
+
+  var clearRulers = document.createElement("input");
+  clearRulers.value = "Clear Rulers";
+  clearRulers.type = "button";
+  clearRulers.onclick = function() {
+    socket.send(JSON.stringify({ msg: "clear-annotations" }));
+  };
+  cell.appendChild(clearRulers);
+     
+  var index = 0;
+
+  annotations.forEach(function(a) {
+
+    var option = document.createElement("option");
+    option.value = index;
+    option.text = a;
+
+    rulersSelect.appendChild(option);
+
+    index += 1;
+
+  });
+}
 
 //  Updates the layer list
 function showLayers(layers) {
